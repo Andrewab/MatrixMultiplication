@@ -19,7 +19,7 @@ void *crossProduct(void *_args);
 double findSquaredDif(double **noThreadMatrix, int size);
 //Global Variables
 double **productMatrix;
-int counter = 0;// global counter onto which elem the threadedMatrixMult is currently operati
+int counter = 0;// global counter onto which elem the multithreaded approach is currently operating on
 pthread_mutex_t lock;
 
 int main(int argc, char **argv) {
