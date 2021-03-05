@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <pthread.h>
-#include <time.h>
+#include <limits.h>
 #include <sys/time.h>
 
 struct thread_args {
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   int size = atoi(argv[2]);//size of matrices
   double **MatrixA = fill(size);//creates matixA with random nums
   double **MatrixB = fill(size);//Creates MatrixB with random Nums
-  long int fastestTime = 2147483647;//initializes fastest time at largest val
+  int fastestTime = INT_MAX;//initializes fastest time at largest val
   struct timeval start_time;
   struct timeval end_time;
   for(int i = 0; i < 5; i++) {//does matrix math on matrixA and MatrixB 5 times, takes fastest time and prints it
@@ -40,27 +40,30 @@ int main(int argc, char **argv) {
     gettimeofday(&end_time,NULL);
     if((end_time.tv_usec - start_time.tv_usec) < fastestTime){
       fastestTime = end_time.tv_usec - start_time.tv_usec;
+    }
   }
-    double **noThreadMatrix = productMatrix;
-  printf("Fastest time without Multithreading: %ld Microseconds\n", fastestTime);
+  double **noThreadMatrix = productMatrix;
+  printf("Fastest time without Multithreading: %d Microseconds\n", fastestTime);
   if(numThreads > 0) {
-    long int fastestTimeMultThread = 2147483647;
+    int fastestTimeMultThread = INT_MAX;
+    struct timeval start_time_multithread;
+    struct timeval end_time_multithread;
     for(int j = 0; j < 5; j++) {
-      gettimeofday(&start_time,NULL);
+      gettimeofday(&start_time_multithread,NULL);
       threadedMatrixMult(numThreads, size, MatrixA, MatrixB);
-      gettimeofday(&end_time,NULL);
-      if((end_time.tv_usec - start_time.tv_usec) < fastestTimeMultThread) {
-	fastestTimeMultThread = end_time.tv_usec - start_time.tv_usec;
+      gettimeofday(&end_time_multithread,NULL);
+      printf("start time: %d\n end time: %d\ntime dif : %d\n",start_time_multithread.tv_usec, end_time_multithread.tv_usec, (end_time_multithread.tv_usec - start_time_multithread.tv_usec));
+      if((end_time_multithread.tv_usec - start_time_multithread.tv_usec) < fastestTimeMultThread) {
+	fastestTimeMultThread = end_time_multithread.tv_usec - start_time_multithread.tv_usec;
       }
     } 
-    long int timeDif = fastestTime - fastestTimeMultThread;
+    int timeDif = fastestTime - fastestTimeMultThread;
     double squaredDif = findSquaredDif(noThreadMatrix, size);
-    printf("Fastest time with multithreading: %ld\n", fastestTimeMultThread);
-    printf("Time gained by multithreading: %ld Microseconds\n", timeDif);
+    printf("Fastest time with multithreading: %d\n", fastestTimeMultThread);
+    printf("Time gained by multithreading: %d Microseconds\n", timeDif);
     printf("Observed error: %f\n", squaredDif);
   }
   return 0;
-  }
 }
 /*---------------------------------------------------
 findSquaredDif() finds the sum of the error difference
@@ -164,6 +167,7 @@ the crossProduct value.
 
 Returns NULL on Completion
  -------------------------------------------------------*/
+/*
 void *crossProduct(void *_args) {
   pthread_mutex_lock(&lock);
   struct thread_args *args = (struct thread_args*)_args;
@@ -187,4 +191,28 @@ void *crossProduct(void *_args) {
   }
   return NULL;
   
+}
+*/
+void *crossProduct(void *_args) {
+  struct thread_args *args = (struct thread_args*)_args;
+  int size = args->size;
+  int col;
+  int row;
+  double **MatrixA = args->MatrixA;
+  double **MatrixB = args->MatrixB;
+  double crossProductSum = 0;
+  pthread_mutex_lock(&lock);
+  while(counter < size*size) {
+    col = counter % size;
+    row = counter / size;
+    for(int i = 0; i < size; i++) {
+      crossProductSum += MatrixA[row][i] * MatrixB[i][col];
+    }
+    productMatrix[row][col] = crossProductSum;
+    counter++;
+    pthread_mutex_unlock(&lock);
+    pthread_mutex_lock(&lock);
+  }
+  pthread_mutex_unlock(&lock);
+  return NULL;
 }
