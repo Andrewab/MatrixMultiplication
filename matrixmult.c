@@ -34,33 +34,47 @@ int main(int argc, char **argv) {
   int fastestTime = INT_MAX;//initializes fastest time at largest val
   struct timeval start_time;
   struct timeval end_time;
+  int t_overlap = 0;
   for(int i = 0; i < 5; i++) {//does matrix math on matrixA and MatrixB 5 times, takes fastest time and prints it
     gettimeofday(&start_time,NULL);
     productMatrix  = MatrixMult(MatrixA,MatrixB,size);
     gettimeofday(&end_time,NULL);
-    if((end_time.tv_usec - start_time.tv_usec) < fastestTime){
-      fastestTime = end_time.tv_usec - start_time.tv_usec;
+    if(end_time.tv_sec > start_time.tv_sec) {
+      t_overlap = (end_time.tv_sec - start_time.tv_sec) * 1000000;
     }
+    if(((end_time.tv_usec + t_overlap) - start_time.tv_usec) < fastestTime){
+      fastestTime = (end_time.tv_usec + t_overlap) - start_time.tv_usec;
+    }
+    t_overlap = 0;
   }
   double **noThreadMatrix = productMatrix;
   printf("Fastest time without Multithreading: %d Microseconds\n", fastestTime);
-  if(numThreads > 0) {
+  if(numThreads > 0) {// Only runs if requested num of threads is greater then 0
     int fastestTimeMultThread = INT_MAX;
     struct timeval start_time_multithread;
     struct timeval end_time_multithread;
+    t_overlap = 0;
+    /*
+      Runs the non threaded approach to solving the matrix 5 times, then takes fastest time and stores that as fastestTimeMultThread
+     */
     for(int j = 0; j < 5; j++) {
       gettimeofday(&start_time_multithread,NULL);
       threadedMatrixMult(numThreads, size, MatrixA, MatrixB);
       gettimeofday(&end_time_multithread,NULL);
-      printf("start time: %d\n end time: %d\ntime dif : %d\n",start_time_multithread.tv_usec, end_time_multithread.tv_usec, (end_time_multithread.tv_usec - start_time_multithread.tv_usec));
-      if((end_time_multithread.tv_usec - start_time_multithread.tv_usec) < fastestTimeMultThread) {
-	fastestTimeMultThread = end_time_multithread.tv_usec - start_time_multithread.tv_usec;
+      if(end_time_multithread.tv_sec > start_time_multithread.tv_sec) {
+	t_overlap = (end_time_multithread.tv_sec - start_time_multithread.tv_sec) * 1000000;
       }
+      if(((end_time_multithread.tv_usec + t_overlap) - start_time_multithread.tv_usec) < fastestTimeMultThread) {
+	fastestTimeMultThread = (end_time_multithread.tv_usec + t_overlap) - start_time_multithread.tv_usec;
+      }
+      t_overlap = 0;
     } 
     int timeDif = fastestTime - fastestTimeMultThread;
     double squaredDif = findSquaredDif(noThreadMatrix, size);
-    printf("Fastest time with multithreading: %d\n", fastestTimeMultThread);
-    printf("Time gained by multithreading: %d Microseconds\n", timeDif);
+    printf("Multiplying random matrices of size: %dx%d\n", size,size);
+    printf("Fastest time %d threads: %d\n", numThreads, fastestTimeMultThread);
+    double speedUpFactor = fastestTime / fastestTimeMultThread;
+    printf("SpeedUp Factor is : %f\n", speedUpFactor);
     printf("Observed error: %f\n", squaredDif);
   }
   return 0;
@@ -167,32 +181,6 @@ the crossProduct value.
 
 Returns NULL on Completion
  -------------------------------------------------------*/
-/*
-void *crossProduct(void *_args) {
-  pthread_mutex_lock(&lock);
-  struct thread_args *args = (struct thread_args*)_args;
-  int size = args->size;
-  if(counter < size*size) {
-    int col = counter % size;
-    int row = counter / size;
-    double **MatrixA = args->MatrixA;
-    double **MatrixB = args->MatrixB;
-    double crossProductSum = 0;
-    for(int i = 0; i < size; i++) {
-      crossProductSum += MatrixA[row][i] * MatrixB[i][col];
-    }
-    productMatrix[row][col] = crossProductSum;
-    counter++;
-    pthread_mutex_unlock(&lock);
-    crossProduct((void*)args);
-  }
-  if(pthread_mutex_unlock(&lock) != 0) {
-    perror("pthread_mutex_unlock error");
-  }
-  return NULL;
-  
-}
-*/
 void *crossProduct(void *_args) {
   struct thread_args *args = (struct thread_args*)_args;
   int size = args->size;
@@ -206,9 +194,9 @@ void *crossProduct(void *_args) {
     col = counter % size;
     row = counter / size;
     for(int i = 0; i < size; i++) {
-      crossProductSum += MatrixA[row][i] * MatrixB[i][col];
+      crossProductSum += MatrixA[row][i] * MatrixB[i][col];//sums cross product of matrix
     }
-    productMatrix[row][col] = crossProductSum;
+    productMatrix[row][col] = crossProductSum;// places crossprodcut into correct location in the matrix
     counter++;
     pthread_mutex_unlock(&lock);
     pthread_mutex_lock(&lock);
